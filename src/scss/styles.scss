@@ -1,3 +1,16 @@
-.testing {
-  width: percentage(5/7);
+html,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+#neighborhood-map {
+  height: 100%;
+  position: initial !important;
+}
+
+.nav-bar-search-city {
+  width: 50%;
+  display: inline-flex;
 }
