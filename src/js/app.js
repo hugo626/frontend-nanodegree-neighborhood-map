@@ -2,34 +2,143 @@
 
  var map, autocompleteAddress,
    googleAddress = new MapLocation(37.4224936, -122.0877586),
-   searchedCenter = ko.observable();
+   foursquareAPI = 'https://api.foursquare.com/v2/venues/explore?v=20170627&client_id=5FGAX5XB03JLW5CIP10XDGS1RBBKXRP5NU2CRG4SUSXVN42G&client_secret=UGUH4QH3A5RFUPXGVDCIFN2JIYZGQ4IZYEXSWFHT4UJA0TS2&query=food&limit=10&ll=',
+   searchedCenter = ko.observable(googleAddress);
 
- function MapLocation(lat, lng, zoom) {
+ function MapLocation(lat, lng) {
    var self = this;
    self.latLng = {
      lat: lat,
      lng: lng
    };
-   self.zoom = zoom || 13;
  }
 
  // bind the resize event with hamburger button
  // Here's my data model
  var ViewModel = function(googleMap) {
    var self = this;
+   var streetViewInfowindow = new google.maps.InfoWindow();
    self.map = googleMap;
-   self.locationList = ko.observableArray();
+   self.markerList = ko.observableArray();
 
-   self.searchRestaurants = function() {
+
+   self.searchHandler = function() {
      map.panTo(searchedCenter().latLng);
-
+     self.searchRestaurants();
    };
 
+   self.getInitialGeoLocation = function() {
+     if (navigator.geolocation) {
+       navigator.geolocation.getCurrentPosition(function(position) {
+         searchedCenter(new MapLocation(position.coords.latitude, position.coords.longitude));
+       });
+     }
+     self.searchHandler();
+   };
+
+   self.searchRestaurants = function() {
+     $.ajax({
+       url: foursquareAPI + searchedCenter().latLng.lat + ',' + searchedCenter().latLng.lng,
+       context: document.body
+     }).done(function(fourSquareData) {
+       if (fourSquareData.meta.code === 200) {
+         self.markerList.removeAll();
+         _generateMakers(fourSquareData,streetViewInfowindow);
+       } else {
+         _handleErrors("No Venue found.");
+       }
+     }).fail(function(err) {
+       self.handleErrors(err);
+     });
+   };
+
+   function _generateMakers(fourSquareData, infowindow) {
+     console.log(fourSquareData);
+     fourSquareData.response.groups[0].items.forEach(function(item, index) {
+       var location = new MapLocation(item.venue.location.lat, item.venue.location.lng);
+       var marker = new google.maps.Marker({
+         position: location.latLng,
+         title: item.venue.name,
+         animation: google.maps.Animation.DROP,
+         id: index,
+         address: item.venue.location.formattedAddress,
+         latLng: location.latLng
+       });
+       self.markerList().push(marker);
+       // Create an onclick event to open the large infowindow at each marker.
+       marker.addListener('click', function() {
+         _populateInfoWindow(this, infowindow);
+       });
+     });
+
+     _showMarkers();
+   }
+
+   function _populateInfoWindow(marker, infowindow) {
+     // In case the status is OK, which means the pano was found, compute the
+     // position of the streetview image, then calculate the heading, then get a
+     // panorama from that and set the options
+     function getStreetView(data, status) {
+       if (status === google.maps.StreetViewStatus.OK) {
+         var nearStreetViewLocation = data.location.latLng;
+         var heading = google.maps.geometry.spherical.computeHeading(
+           nearStreetViewLocation, marker.position);
+         infowindow.setContent('<div>' + marker.title + '</div><div>' + marker.address+ '</div><div>' + marker.latLng.lat+','+marker.latLng.lng+'</div><div id="pano"></div>');
+         var panoramaOptions = {
+           position: nearStreetViewLocation,
+           pov: {
+             heading: heading,
+             pitch: 30
+           }
+         };
+         var panorama = new google.maps.StreetViewPanorama(
+           document.getElementById('pano'), panoramaOptions);
+       } else {
+         infowindow.setContent('<div>' + marker.title + '</div>' +
+           '<div>No Street View Found</div>');
+       }
+     }
+
+     // Check to make sure the infowindow is not already opened on this marker.
+     if (infowindow.marker !== marker) {
+       // Clear the infowindow content to give the streetview time to load.
+       infowindow.setContent('');
+       infowindow.marker = marker;
+       // Make sure the marker property is cleared if the infowindow is closed.
+       infowindow.addListener('closeclick', function() {
+         infowindow.marker = null;
+       });
+       var streetViewService = new google.maps.StreetViewService();
+       var radius = 50;
+
+       // Use streetview service to get the closest streetview image within
+       // 50 meters of the markers position
+       streetViewService.getPanoramaByLocation(marker.position, radius, getStreetView);
+       // Open the infowindow on the correct marker.
+       infowindow.open(map, marker);
+     }
+   }
+
+   function _showMarkers() {
+     var bounds = new google.maps.LatLngBounds();
+     // Extend the boundaries of the map for each marker and display the marker
+     self.markerList().forEach(function(marker) {
+       marker.setMap(self.map);
+       bounds.extend(marker.position);
+     });
+     //  self.map.fitBounds(bounds);
+     self.map.setCenter(bounds.getCenter());
+   }
+
+   function _handleErrors(errorMessage) {
+     alert(errorMessage);
+   }
+
+   self.getInitialGeoLocation();
  };
 
  // initialize the map
  function initMap() {
-   getInitialGeoLocation();
    map = new google.maps.Map(document.getElementById('neighborhood-map'), {
      center: searchedCenter().latLng,
      mapTypeControl: true,
@@ -37,7 +146,7 @@
        style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
        position: google.maps.ControlPosition.TOP_RIGHT
      },
-     zoom: searchedCenter().zoom
+     zoom: 13
    });
    // Create the autocomplete object, restricting the search to geographical
    // location types.
@@ -54,18 +163,4 @@
    });
 
    ko.applyBindings(new ViewModel(map)); // This makes Knockout get to work
- }
-
- function getInitialGeoLocation() {
-   searchedCenter(googleAddress);
-   if (navigator.geolocation) {
-     navigator.geolocation.getCurrentPosition(function(position) {
-       searchedCenter(new MapLocation(position.coords.latitude, position.coords.longitude));
-     });
-   }
- }
-
-
- function handleErrors(errorMessage) {
-   alert(errorMessage);
  }
