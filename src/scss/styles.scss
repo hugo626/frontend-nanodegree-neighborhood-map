@@ -1,3 +1,4 @@
+$drawer-width: 300px;
 html,
 body {
   height: 100%;
@@ -11,11 +12,24 @@ body {
 }
 
 .nav-bar-search-city {
-  width: 50%;
+  width: 70%;
+  min-width: 300px;
   display: inline-flex;
+  @media screen and (min-width: 1025px) {
+    margin-left: 50px;
+  }
+  @media screen and (max-width: 375px) {
+    width: 80%;
+  }
 }
 
 #pano {
   width: 200px;
   height: 200px;
+}
+
+.map_drawer {
+  max-width: $drawer-width;
+  width: $drawer-width;
+  transform: translateX(-$drawer-width);
 }

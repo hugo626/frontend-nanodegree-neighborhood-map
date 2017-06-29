@@ -1,16 +1,17 @@
  /* globals $,ko,google*/
 
  var map, autocompleteAddress,
-   googleAddress = new MapLocation(37.4224936, -122.0877586),
-   foursquareAPI = 'https://api.foursquare.com/v2/venues/explore?v=20170627&client_id=5FGAX5XB03JLW5CIP10XDGS1RBBKXRP5NU2CRG4SUSXVN42G&client_secret=UGUH4QH3A5RFUPXGVDCIFN2JIYZGQ4IZYEXSWFHT4UJA0TS2&query=food&limit=10&ll=',
+   googleAddress = new MapLocation( 37.4224936,-122.0877586, "1600 Amphitheatre Parkway, Mountain View, CA 94043, United States"),
+   foursquareAPI = 'https://api.foursquare.com/v2/venues/explore?v=20170627&client_id=5FGAX5XB03JLW5CIP10XDGS1RBBKXRP5NU2CRG4SUSXVN42G&client_secret=UGUH4QH3A5RFUPXGVDCIFN2JIYZGQ4IZYEXSWFHT4UJA0TS2&query=food&limit=20&ll=',
    searchedCenter = ko.observable(googleAddress);
 
- function MapLocation(lat, lng) {
+ function MapLocation(lat, lng, address) {
    var self = this;
    self.latLng = {
      lat: lat,
      lng: lng
    };
+   self.address = address;
  }
 
  // bind the resize event with hamburger button
@@ -18,9 +19,10 @@
  var ViewModel = function(googleMap) {
    var self = this;
    var streetViewInfowindow = new google.maps.InfoWindow();
+   var geocoder = new google.maps.Geocoder();
+
    self.map = googleMap;
    self.markerList = ko.observableArray();
-
 
    self.searchHandler = function() {
      map.panTo(searchedCenter().latLng);
@@ -43,7 +45,7 @@
      }).done(function(fourSquareData) {
        if (fourSquareData.meta.code === 200) {
          self.markerList.removeAll();
-         _generateMakers(fourSquareData,streetViewInfowindow);
+         _generateMakers(fourSquareData, streetViewInfowindow);
        } else {
          _handleErrors("No Venue found.");
        }
@@ -54,17 +56,18 @@
 
    function _generateMakers(fourSquareData, infowindow) {
      console.log(fourSquareData);
+
      fourSquareData.response.groups[0].items.forEach(function(item, index) {
-       var location = new MapLocation(item.venue.location.lat, item.venue.location.lng);
+       var location =  _findAccurateLatLngByAddress(item.venue.location);
+
        var marker = new google.maps.Marker({
-         position: location.latLng,
+         position: location,
          title: item.venue.name,
          animation: google.maps.Animation.DROP,
          id: index,
          address: item.venue.location.formattedAddress,
-         latLng: location.latLng
        });
-       self.markerList().push(marker);
+       self.markerList.push(marker);
        // Create an onclick event to open the large infowindow at each marker.
        marker.addListener('click', function() {
          _populateInfoWindow(this, infowindow);
@@ -83,7 +86,7 @@
          var nearStreetViewLocation = data.location.latLng;
          var heading = google.maps.geometry.spherical.computeHeading(
            nearStreetViewLocation, marker.position);
-         infowindow.setContent('<div>' + marker.title + '</div><div>' + marker.address+ '</div><div>' + marker.latLng.lat+','+marker.latLng.lng+'</div><div id="pano"></div>');
+         infowindow.setContent('<div>' + marker.title + '</div><div>' + marker.address + '</div><div>' + marker.position.lat() + ',' + marker.position.lng() + '</div><div id="pano"></div>');
          var panoramaOptions = {
            position: nearStreetViewLocation,
            pov: {
@@ -94,7 +97,7 @@
          var panorama = new google.maps.StreetViewPanorama(
            document.getElementById('pano'), panoramaOptions);
        } else {
-         infowindow.setContent('<div>' + marker.title + '</div>' +
+         infowindow.setContent('<div>' + marker.title + '</div><div>' + marker.address + '</div><div>' + marker.position.lat() + ',' + marker.position.lng() + '</div>'+
            '<div>No Street View Found</div>');
        }
      }
@@ -117,6 +120,23 @@
        // Open the infowindow on the correct marker.
        infowindow.open(map, marker);
      }
+   }
+
+   function _findAccurateLatLngByAddress(venueLocation) {
+     var location = {
+       lat: venueLocation.lat,
+       lng: venueLocation.lng
+     };
+     geocoder.geocode({
+       'address': venueLocation.formattedAddress.join(' ')
+     }, function(results, status) {
+       if (status === google.maps.GeocoderStatus.OK) {
+         location = results[0].geometry.location;
+       } else {
+         console.log('unable to find geocoder');
+       }
+     });
+     return location;
    }
 
    function _showMarkers() {
@@ -159,7 +179,7 @@
    // fields in the form.
    autocompleteAddress.addListener('place_changed', function() {
      var place = autocompleteAddress.getPlace();
-     searchedCenter(new MapLocation(place.geometry.location.lat(), place.geometry.location.lng()));
+     searchedCenter(new MapLocation(place.geometry.location.lat(),place.geometry.location.lng()));
    });
 
    ko.applyBindings(new ViewModel(map)); // This makes Knockout get to work
