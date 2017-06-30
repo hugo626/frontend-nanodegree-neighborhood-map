@@ -33,3 +33,9 @@ body {
   width: $drawer-width;
   transform: translateX(-$drawer-width);
 }
+
+.show-makers-button{
+  bottom: 20px;
+  right: 70px;
+  position: fixed;
+}

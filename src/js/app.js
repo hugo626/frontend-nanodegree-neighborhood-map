@@ -1,7 +1,7 @@
  /* globals $,ko,google*/
 
  var map, autocompleteAddress,
-   googleAddress = new MapLocation( 37.4224936,-122.0877586, "1600 Amphitheatre Parkway, Mountain View, CA 94043, United States"),
+   googleAddress = new MapLocation(37.4224936, -122.0877586, "1600 Amphitheatre Parkway, Mountain View, CA 94043, United States"),
    foursquareAPI = 'https://api.foursquare.com/v2/venues/explore?v=20170627&client_id=5FGAX5XB03JLW5CIP10XDGS1RBBKXRP5NU2CRG4SUSXVN42G&client_secret=UGUH4QH3A5RFUPXGVDCIFN2JIYZGQ4IZYEXSWFHT4UJA0TS2&query=food&limit=20&ll=',
    searchedCenter = ko.observable(googleAddress);
 
@@ -20,9 +20,23 @@
    var self = this;
    var streetViewInfowindow = new google.maps.InfoWindow();
    var geocoder = new google.maps.Geocoder();
+   // Initialize the drawing manager.
+   var drawingManager = new google.maps.drawing.DrawingManager({
+     drawingMode: google.maps.drawing.OverlayType.POLYGON,
+     drawingControl: true,
+     drawingControlOptions: {
+       position: google.maps.ControlPosition.TOP_LEFT,
+       drawingModes: [
+         google.maps.drawing.OverlayType.POLYGON
+       ]
+     }
+   });
+   var polygon = null;
 
    self.map = googleMap;
    self.markerList = ko.observableArray();
+   self.selectedMarker = ko.observable();
+
 
    self.searchHandler = function() {
      map.panTo(searchedCenter().latLng);
@@ -54,11 +68,66 @@
      });
    };
 
+   self.selectMarker = function(marker) {
+     _hideAllMarkers();
+     self.selectedMarker(marker);
+     marker.setMap(map);
+   };
+
+   // Add an event listener so that the polygon is captured,  call the
+   // searchWithinPolygon function. This will show the markers in the polygon,
+   // and hide any outside of it.
+   drawingManager.addListener('overlaycomplete', function(event) {
+     // First, check if there is an existing polygon.
+     // If there is, get rid of it and remove the markers
+     if (polygon) {
+       polygon.setMap(null);
+       _hideAllMarkers();
+     }
+     // Switching the drawing mode to the HAND (i.e., no longer drawing).
+     drawingManager.setDrawingMode(null);
+     // Creating a new editable polygon from the overlay.
+     polygon = event.overlay;
+     polygon.setEditable(true);
+     // Searching within the polygon.
+     searchWithinPolygon();
+     // Make sure the search is re-done if the poly is changed.
+     polygon.getPath().addListener('set_at', searchWithinPolygon);
+     polygon.getPath().addListener('insert_at', searchWithinPolygon);
+   });
+
+
+   // This shows and hides (respectively) the drawing options.
+   self.toggleDrawing = function() {
+     if (drawingManager.map) {
+       drawingManager.setMap(null);
+       // In case the user drew anything, get rid of the polygon
+       if (polygon !== null) {
+         polygon.setMap(null);
+       }
+     } else {
+       drawingManager.setMap(map);
+     }
+   };
+
+   // This function hides all markers outside the polygon,
+   // and shows only the ones within it. This is so that the
+   // user can specify an exact area of search.
+   function searchWithinPolygon() {
+     self.markerList().forEach(function (marker) {
+       if (google.maps.geometry.poly.containsLocation(marker.position, polygon)) {
+         marker.setMap(map);
+       } else {
+         marker.setMap(null);
+       }
+     });
+   }
+
    function _generateMakers(fourSquareData, infowindow) {
      console.log(fourSquareData);
 
      fourSquareData.response.groups[0].items.forEach(function(item, index) {
-       var location =  _findAccurateLatLngByAddress(item.venue.location);
+       var location = _findAccurateLatLngByAddress(item.venue.location);
 
        var marker = new google.maps.Marker({
          position: location,
@@ -74,7 +143,7 @@
        });
      });
 
-     _showMarkers();
+     self.showAllMarkers();
    }
 
    function _populateInfoWindow(marker, infowindow) {
@@ -97,7 +166,7 @@
          var panorama = new google.maps.StreetViewPanorama(
            document.getElementById('pano'), panoramaOptions);
        } else {
-         infowindow.setContent('<div>' + marker.title + '</div><div>' + marker.address + '</div><div>' + marker.position.lat() + ',' + marker.position.lng() + '</div>'+
+         infowindow.setContent('<div>' + marker.title + '</div><div>' + marker.address + '</div><div>' + marker.position.lat() + ',' + marker.position.lng() + '</div>' +
            '<div>No Street View Found</div>');
        }
      }
@@ -139,7 +208,7 @@
      return location;
    }
 
-   function _showMarkers() {
+   self.showAllMarkers = function() {
      var bounds = new google.maps.LatLngBounds();
      // Extend the boundaries of the map for each marker and display the marker
      self.markerList().forEach(function(marker) {
@@ -148,6 +217,13 @@
      });
      //  self.map.fitBounds(bounds);
      self.map.setCenter(bounds.getCenter());
+   };
+
+   // This function will loop through the listings and hide them all.
+   function _hideAllMarkers() {
+     self.markerList().forEach(function(marker) {
+       marker.setMap(null);
+     });
    }
 
    function _handleErrors(errorMessage) {
@@ -179,7 +255,7 @@
    // fields in the form.
    autocompleteAddress.addListener('place_changed', function() {
      var place = autocompleteAddress.getPlace();
-     searchedCenter(new MapLocation(place.geometry.location.lat(),place.geometry.location.lng()));
+     searchedCenter(new MapLocation(place.geometry.location.lat(), place.geometry.location.lng()));
    });
 
    ko.applyBindings(new ViewModel(map)); // This makes Knockout get to work
