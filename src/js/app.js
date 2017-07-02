@@ -32,6 +32,12 @@
      }
    });
    var polygon = null;
+   // Style the markers a bit. This will be our listing marker icon.
+   var defaultIcon = _makeMarkerIcon('0091ff');
+
+   // Create a "highlighted location" marker color for when the user
+   // mouses over the marker.
+   var highlightedIcon = _makeMarkerIcon('dd6666');
 
    self.map = googleMap;
    self.markerList = ko.observableArray();
@@ -72,6 +78,8 @@
      _hideAllMarkers();
      self.selectedMarker(marker);
      marker.setMap(map);
+     _toggleBounce(marker);
+     _populateInfoWindow(marker, streetViewInfowindow);
    };
 
    // Add an event listener so that the polygon is captured,  call the
@@ -114,7 +122,7 @@
    // and shows only the ones within it. This is so that the
    // user can specify an exact area of search.
    function searchWithinPolygon() {
-     self.markerList().forEach(function (marker) {
+     self.markerList().forEach(function(marker) {
        if (google.maps.geometry.poly.containsLocation(marker.position, polygon)) {
          marker.setMap(map);
        } else {
@@ -134,16 +142,37 @@
          title: item.venue.name,
          animation: google.maps.Animation.DROP,
          id: index,
+         icon: defaultIcon,
          address: item.venue.location.formattedAddress,
+         categories: item.venue.categories[0].name,
+         rating: item.venue.rating
        });
        self.markerList.push(marker);
        // Create an onclick event to open the large infowindow at each marker.
        marker.addListener('click', function() {
          _populateInfoWindow(this, infowindow);
+         _toggleBounce(this);
+       });
+       // Two event listeners - one for mouseover, one for mouseout,
+       // to change the colors back and forth.
+       marker.addListener('mouseover', function() {
+         this.setIcon(highlightedIcon);
+       });
+       marker.addListener('mouseout', function() {
+         this.setIcon(defaultIcon);
        });
      });
 
      self.showAllMarkers();
+   }
+
+   // This function takes in a COLOR, and then creates a new marker
+   // icon of that color. The icon will be 21 px wide by 34 high, have an origin
+   // of 0, 0 and be anchored at 10, 34).
+   function _makeMarkerIcon(markerColor) {
+     var markerImage = new google.maps.MarkerImage(
+       'http://chart.googleapis.com/chart?chst=d_map_pin_icon&chld=restaurant|' + markerColor);
+     return markerImage;
    }
 
    function _populateInfoWindow(marker, infowindow) {
@@ -151,11 +180,23 @@
      // position of the streetview image, then calculate the heading, then get a
      // panorama from that and set the options
      function getStreetView(data, status) {
+       var content = '<div class="map-inforwindow">' +
+         '<div class= "infor-text">' +
+         '<div class="infor-text-title title">' + marker.title + '</div>' +
+         '<div class="map-inforwindow infor-text-rating">' +
+         '<div class="label">Rating:</div><div>' + marker.rating + '</div></div>' +
+         '<div class="infor-text-address">' +
+         '<div class="label">Address"</div>' +
+         '<div><div>' + marker.address[0] + '</div><div>' + marker.address[1] + '</div><div>' + marker.address[2] + '</div></div></div>' +
+         '<div class="infor-text-categories">' +
+         '<div class="label">Categories:</div>' +
+         '<div>' + marker.categories + '</div></div></div>';
+
        if (status === google.maps.StreetViewStatus.OK) {
          var nearStreetViewLocation = data.location.latLng;
          var heading = google.maps.geometry.spherical.computeHeading(
            nearStreetViewLocation, marker.position);
-         infowindow.setContent('<div>' + marker.title + '</div><div>' + marker.address + '</div><div>' + marker.position.lat() + ',' + marker.position.lng() + '</div><div id="pano"></div>');
+         infowindow.setContent(content + '<div id="pano"></div></div>');
          var panoramaOptions = {
            position: nearStreetViewLocation,
            pov: {
@@ -163,11 +204,9 @@
              pitch: 30
            }
          };
-         var panorama = new google.maps.StreetViewPanorama(
-           document.getElementById('pano'), panoramaOptions);
+         var panorama = new google.maps.StreetViewPanorama(document.getElementById('pano'), panoramaOptions);
        } else {
-         infowindow.setContent('<div>' + marker.title + '</div><div>' + marker.address + '</div><div>' + marker.position.lat() + ',' + marker.position.lng() + '</div>' +
-           '<div>No Street View Found</div>');
+         infowindow.setContent(content + '<div id="pano">No Street View Found</div><div>');
        }
      }
 
@@ -179,6 +218,7 @@
        // Make sure the marker property is cleared if the infowindow is closed.
        infowindow.addListener('closeclick', function() {
          infowindow.marker = null;
+         marker.setAnimation(null);
        });
        var streetViewService = new google.maps.StreetViewService();
        var radius = 50;
@@ -189,6 +229,20 @@
        // Open the infowindow on the correct marker.
        infowindow.open(map, marker);
      }
+   }
+
+   function _toggleBounce(selectedMarker) {
+     self.markerList().forEach(function(marker) {
+       if (marker === selectedMarker) {
+         if (marker.getAnimation() !== null) {
+           marker.setAnimation(null);
+         } else {
+           marker.setAnimation(google.maps.Animation.BOUNCE);
+         }
+       } else {
+         marker.setAnimation(null);
+       }
+     });
    }
 
    function _findAccurateLatLngByAddress(venueLocation) {
@@ -217,6 +271,7 @@
      });
      //  self.map.fitBounds(bounds);
      self.map.setCenter(bounds.getCenter());
+     self.selectedMarker(null);
    };
 
    // This function will loop through the listings and hide them all.

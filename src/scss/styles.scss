@@ -1,4 +1,5 @@
 $drawer-width: 300px;
+$pano-size: 200px;
 html,
 body {
   height: 100%;
@@ -24,8 +25,8 @@ body {
 }
 
 #pano {
-  width: 200px;
-  height: 200px;
+  width: $pano-size;
+  height: $pano-size;
 }
 
 .map_drawer {
@@ -38,4 +39,19 @@ body {
   bottom: 20px;
   right: 70px;
   position: fixed;
+}
+
+.nav-title{
+  font-weight: 800;
+}
+.title,.label{
+  font-weight: 600;
+}
+
+.address-label-text,.map-inforwindow{
+  display: flex;
+}
+
+.infor-text-rating{
+  flex-flow: row wrap;
 }
