@@ -1,66 +1,102 @@
  /* globals $,ko,google*/
 
- var map, autocompleteAddress,
-   googleAddress = new MapLocation(37.4224936, -122.0877586, "1600 Amphitheatre Parkway, Mountain View, CA 94043, United States"),
-   foursquareAPI = 'https://api.foursquare.com/v2/venues/explore?v=20170627&client_id=5FGAX5XB03JLW5CIP10XDGS1RBBKXRP5NU2CRG4SUSXVN42G&client_secret=UGUH4QH3A5RFUPXGVDCIFN2JIYZGQ4IZYEXSWFHT4UJA0TS2&query=food&limit=20&ll=',
+ /**
+  * Global Variables whcih will be used cross between initMap function and ViewModel.
+  */
+ var map,
+   googleAddress = {
+     lat: 37.4224936,
+     lng: -122.0877586
+   }, //Google's address "1600 Amphitheatre Parkway, Mountain View, CA 94043, United States"
+   foursquareAPI = 'https://api.foursquare.com/v2/venues/explore?v=20170627&client_id=5FGAX5XB03JLW5CIP10XDGS1RBBKXRP5NU2CRG4SUSXVN42G&client_secret=UGUH4QH3A5RFUPXGVDCIFN2JIYZGQ4IZYEXSWFHT4UJA0TS2&query=food&ll=',
    searchedCenter = ko.observable(googleAddress);
 
- function MapLocation(lat, lng, address) {
-   var self = this;
-   self.latLng = {
-     lat: lat,
-     lng: lng
-   };
-   self.address = address;
- }
-
- // bind the resize event with hamburger button
- // Here's my data model
+ /**
+  * The ViewModel which will be used to binding with index.html by using Knockout.js.
+  * 
+  * @param {object} googleMap The google map object which is created by google javascript library.
+  */
  var ViewModel = function(googleMap) {
    var self = this;
-   var streetViewInfowindow = new google.maps.InfoWindow();
-   var geocoder = new google.maps.Geocoder();
-   // Initialize the drawing manager.
-   var drawingManager = new google.maps.drawing.DrawingManager({
-     drawingMode: google.maps.drawing.OverlayType.POLYGON,
-     drawingControl: true,
-     drawingControlOptions: {
-       position: google.maps.ControlPosition.TOP_LEFT,
-       drawingModes: [
-         google.maps.drawing.OverlayType.POLYGON
-       ]
-     }
-   });
-   var polygon = null;
-   // Style the markers a bit. This will be our listing marker icon.
-   var defaultIcon = _makeMarkerIcon('0091ff');
+   var streetViewInfowindow = new google.maps.InfoWindow(),
+     geocoder = new google.maps.Geocoder(),
+     // Initialize the drawing manager. 
+     drawingManager = new google.maps.drawing.DrawingManager({
+       drawingMode: google.maps.drawing.OverlayType.POLYGON,
+       drawingControl: true,
+       drawingControlOptions: {
+         position: google.maps.ControlPosition.TOP_LEFT,
+         drawingModes: [
+           google.maps.drawing.OverlayType.POLYGON
+         ]
+       }
+     }),
+     // Create the autocomplete object, restricting the search to geographical
+     // location types.
+     autocompleteAddress = new google.maps.places.Autocomplete(
+       (document.getElementById('autocomplete-address')), {
+         types: ['geocode']
+       });
 
-   // Create a "highlighted location" marker color for when the user
-   // mouses over the marker.
-   var highlightedIcon = _makeMarkerIcon('dd6666');
+
+   var polygon = null,
+     // define the default Icon for normal Icon.
+     defaultIcon = _makeMarkerIcon('0091ff'),
+     // define the icon which will be used when user mouse hover ove the marker.
+     highlightedIcon = _makeMarkerIcon('dd6666');
 
    self.map = googleMap;
    self.markerList = ko.observableArray();
    self.selectedMarker = ko.observable();
 
+   /**
+    * When user selected the address from input field, the address will be saved in 
+    * searchCenter, so when user really press search button, we will call google api
+    * and foursquare api to make the search.
+    */
+   autocompleteAddress.addListener('place_changed', function() {
+     var place = autocompleteAddress.getPlace();
+     searchedCenter({
+       lat: place.geometry.location.lat(),
+       lng: place.geometry.location.lng()
+     });
+   });
 
+   /**
+    * The function to handle click event on the seacth button.
+    * Tow section work will be done here: make the map center to user's search center.
+    * Call foursquare api to seach restaurants around the user's searched address.
+    */
    self.searchHandler = function() {
-     map.panTo(searchedCenter().latLng);
+     map.panTo(searchedCenter());
      self.searchRestaurants();
    };
 
+   /**
+    * We would like to make the website a little bit smarter, so if we 
+    * can accsee user's geolocation, then we will make the start loation
+    * based on their location, otherwise, use the default location: Google's address.
+    */
    self.getInitialGeoLocation = function() {
+     self.searchHandler();
      if (navigator.geolocation) {
        navigator.geolocation.getCurrentPosition(function(position) {
-         searchedCenter(new MapLocation(position.coords.latitude, position.coords.longitude));
+         searchedCenter({
+           lat: position.coords.latitude,
+           lng: position.coords.longitude
+         });
+         self.searchHandler();
        });
      }
-     self.searchHandler();
    };
 
+   /**
+    * This function is mainly used to call foursquare's api to search the restaurants around 
+    * user's search center address. For every found restaurant, we will generate a marker for it.
+    */
    self.searchRestaurants = function() {
      $.ajax({
-       url: foursquareAPI + searchedCenter().latLng.lat + ',' + searchedCenter().latLng.lng,
+       url: foursquareAPI + searchedCenter().lat + ',' + searchedCenter().lng,
        context: document.body
      }).done(function(fourSquareData) {
        if (fourSquareData.meta.code === 200) {
@@ -70,11 +106,15 @@
          _handleErrors("No Venue found.");
        }
      }).fail(function(err) {
-       self.handleErrors(err);
+       _handleErrors('Fail to send request [' + err.statusText + '], please check your internet connection.');
      });
    };
 
-   self.selectMarker = function(marker) {
+   /**
+    * When a marker was selected, firstly hide other markers, and then make the marker bounce while it was selected.
+    * Also display the inforwidnow.
+    */
+   self.selectMarkerHandler = function(marker) {
      _hideAllMarkers();
      self.selectedMarker(marker);
      marker.setMap(map);
@@ -82,58 +122,82 @@
      _populateInfoWindow(marker, streetViewInfowindow);
    };
 
-   // Add an event listener so that the polygon is captured,  call the
-   // searchWithinPolygon function. This will show the markers in the polygon,
-   // and hide any outside of it.
-   drawingManager.addListener('overlaycomplete', function(event) {
-     // First, check if there is an existing polygon.
-     // If there is, get rid of it and remove the markers
-     if (polygon) {
-       polygon.setMap(null);
-       _hideAllMarkers();
-     }
-     // Switching the drawing mode to the HAND (i.e., no longer drawing).
-     drawingManager.setDrawingMode(null);
-     // Creating a new editable polygon from the overlay.
-     polygon = event.overlay;
-     polygon.setEditable(true);
-     // Searching within the polygon.
-     searchWithinPolygon();
-     // Make sure the search is re-done if the poly is changed.
-     polygon.getPath().addListener('set_at', searchWithinPolygon);
-     polygon.getPath().addListener('insert_at', searchWithinPolygon);
-   });
-
-
-   // This shows and hides (respectively) the drawing options.
-   self.toggleDrawing = function() {
-     if (drawingManager.map) {
-       drawingManager.setMap(null);
-       // In case the user drew anything, get rid of the polygon
-       if (polygon !== null) {
-         polygon.setMap(null);
-       }
-     } else {
-       drawingManager.setMap(map);
-     }
-   };
-
-   // This function hides all markers outside the polygon,
-   // and shows only the ones within it. This is so that the
-   // user can specify an exact area of search.
-   function searchWithinPolygon() {
+   /**
+    * Make the selected marker bounce, and make other unselected marker
+    * stop bouncing. 
+    * 
+    * @param {any} selectedMarker 
+    */
+   function _toggleBounce(selectedMarker) {
      self.markerList().forEach(function(marker) {
-       if (google.maps.geometry.poly.containsLocation(marker.position, polygon)) {
-         marker.setMap(map);
+       if (marker === selectedMarker) {
+         if (marker.getAnimation() !== null) {
+           marker.setAnimation(null);
+         } else {
+           marker.setAnimation(google.maps.Animation.BOUNCE);
+         }
        } else {
-         marker.setMap(null);
+         marker.setAnimation(null);
        }
      });
    }
 
-   function _generateMakers(fourSquareData, infowindow) {
-     console.log(fourSquareData);
+   /**
+    * In order to make the street view even mroe accurate, we 
+    * will use Google's geocode to convert the address (whcih is
+    * queried from foursquare APi) into lat and lng.
+    * 
+    * @param {any} venueLocation the location which contains the address of the restaurant.
+    * @returns any object which contains lat and lng of the given address.
+    */
+   function _findAccurateLatLngByAddress(venueLocation) {
+     var location = {
+       lat: venueLocation.lat,
+       lng: venueLocation.lng
+     };
+     geocoder.geocode({
+       'address': venueLocation.formattedAddress.join(' ')
+     }, function(results, status) {
+       if (status === google.maps.GeocoderStatus.OK) {
+         location = results[0].geometry.location;
+       } else {
+         console.log('unable to find geocoder: ' + status);
+       }
+     });
+     return location;
+   }
 
+  /**
+   * This function will disable all markers from the map.
+   */
+   function _hideAllMarkers() {
+     self.markerList().forEach(function(marker) {
+       marker.setMap(null);
+     });
+   }
+
+   /**
+    * Simply display an aler to show the error message to user. 
+    * 
+    * @param {any} errorMessage 
+    */
+   function _handleErrors(errorMessage) {
+     alert(errorMessage);
+   }
+
+   self.getInitialGeoLocation();
+
+   /**************************************************************************
+    * Below the code is inspired by Google's example, so I used it as a skeleton to 
+    * fill up my own code. 
+    */
+   /**
+    * 
+    * @param {any} fourSquareData the JSON object whcih is queried from foursquare API.
+    * @param {any} infowindow The inforWindow object which is used to display the information of 
+    *                         selected location.
+    */
+   function _generateMakers(fourSquareData, infowindow) {
      fourSquareData.response.groups[0].items.forEach(function(item, index) {
        var location = _findAccurateLatLngByAddress(item.venue.location);
 
@@ -163,7 +227,7 @@
        });
      });
 
-     self.showAllMarkers();
+     self.showAllMarkersHandler();
    }
 
    // This function takes in a COLOR, and then creates a new marker
@@ -231,38 +295,10 @@
      }
    }
 
-   function _toggleBounce(selectedMarker) {
-     self.markerList().forEach(function(marker) {
-       if (marker === selectedMarker) {
-         if (marker.getAnimation() !== null) {
-           marker.setAnimation(null);
-         } else {
-           marker.setAnimation(google.maps.Animation.BOUNCE);
-         }
-       } else {
-         marker.setAnimation(null);
-       }
-     });
-   }
-
-   function _findAccurateLatLngByAddress(venueLocation) {
-     var location = {
-       lat: venueLocation.lat,
-       lng: venueLocation.lng
-     };
-     geocoder.geocode({
-       'address': venueLocation.formattedAddress.join(' ')
-     }, function(results, status) {
-       if (status === google.maps.GeocoderStatus.OK) {
-         location = results[0].geometry.location;
-       } else {
-         console.log('unable to find geocoder');
-       }
-     });
-     return location;
-   }
-
-   self.showAllMarkers = function() {
+   /**
+    * This function will be used to 
+    */
+   self.showAllMarkersHandler = function() {
      var bounds = new google.maps.LatLngBounds();
      // Extend the boundaries of the map for each marker and display the marker
      self.markerList().forEach(function(marker) {
@@ -273,25 +309,66 @@
      self.map.setCenter(bounds.getCenter());
      self.selectedMarker(null);
    };
+   /***************************************************************** */
 
-   // This function will loop through the listings and hide them all.
-   function _hideAllMarkers() {
+   /**************************************************************************
+    * Below the code is COPIED from Google's example
+    */
+   // Add an event listener so that the polygon is captured,  call the
+   // searchWithinPolygon function. This will show the markers in the polygon,
+   // and hide any outside of it.
+   drawingManager.addListener('overlaycomplete', function(event) {
+     // First, check if there is an existing polygon.
+     // If there is, get rid of it and remove the markers
+     if (polygon) {
+       polygon.setMap(null);
+       _hideAllMarkers();
+     }
+     // Switching the drawing mode to the HAND (i.e., no longer drawing).
+     drawingManager.setDrawingMode(null);
+     // Creating a new editable polygon from the overlay.
+     polygon = event.overlay;
+     polygon.setEditable(true);
+     // Searching within the polygon.
+     searchWithinPolygon();
+     // Make sure the search is re-done if the poly is changed.
+     polygon.getPath().addListener('set_at', searchWithinPolygon);
+     polygon.getPath().addListener('insert_at', searchWithinPolygon);
+   });
+
+   // This shows and hides (respectively) the drawing options.
+   self.toggleDrawingHandler = function() {
+     if (drawingManager.map) {
+       drawingManager.setMap(null);
+       // In case the user drew anything, get rid of the polygon
+       if (polygon !== null) {
+         polygon.setMap(null);
+       }
+     } else {
+       drawingManager.setMap(map);
+     }
+   };
+
+   // This function hides all markers outside the polygon,
+   // and shows only the ones within it. This is so that the
+   // user can specify an exact area of search.
+   function searchWithinPolygon() {
      self.markerList().forEach(function(marker) {
-       marker.setMap(null);
+       if (google.maps.geometry.poly.containsLocation(marker.position, polygon)) {
+         marker.setMap(map);
+       } else {
+         marker.setMap(null);
+       }
      });
    }
 
-   function _handleErrors(errorMessage) {
-     alert(errorMessage);
-   }
-
-   self.getInitialGeoLocation();
+   /**************************************************************************/
  };
 
- // initialize the map
+ // initialize the map (Inspired by Google's example)
  function initMap() {
    map = new google.maps.Map(document.getElementById('neighborhood-map'), {
-     center: searchedCenter().latLng,
+     center: searchedCenter(),
      mapTypeControl: true,
      mapTypeControlOptions: {
        style: google.maps.MapTypeControlStyle.HORIZONTAL_BAR,
@@ -299,19 +376,5 @@
      },
      zoom: 13
    });
-   // Create the autocomplete object, restricting the search to geographical
-   // location types.
-   autocompleteAddress = new google.maps.places.Autocomplete(
-     (document.getElementById('autocomplete-address')), {
-       types: ['geocode']
-     });
-
-   // When the user selects an address from the dropdown, populate the address
-   // fields in the form.
-   autocompleteAddress.addListener('place_changed', function() {
-     var place = autocompleteAddress.getPlace();
-     searchedCenter(new MapLocation(place.geometry.location.lat(), place.geometry.location.lng()));
-   });
-
    ko.applyBindings(new ViewModel(map)); // This makes Knockout get to work
  }

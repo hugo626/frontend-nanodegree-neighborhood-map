@@ -22,17 +22,16 @@
         <label data-bind="click: searchHandler" class="mdl-button mdl-js-button mdl-button--icon" for="autocomplete-address" title="Search the restaurants">
             <i class="material-icons">search</i>
           </label>
-        <label data-bind="click: toggleDrawing" class="mdl-button mdl-js-button mdl-button--icon" title="Filter markers in a range">
-            <i class="material-icons">mode_edit</i>
-        </label>
       </div>
     </header>
     <div class="map_drawer mdl-layout__drawer">
-      <div class="nav-title mdl-layout-title">Popular Restaurants </div>
+      <div class="nav-title mdl-layout-title">Popular Restaurants: <div>
+        <span data-bind="text:markerList().length"></span> restaurants was found.
+      </div></div>
       <nav class="mdl-navigation">
         <ul data-bind="foreach: markerList " class="demo-list-item mdl-list">
           <li class="mdl-list__item">
-            <div data-bind="click: $parent.selectMarker" class="demo-card-wide mdl-card mdl-shadow--2dp mdl-js-button mdl-js-ripple-effect">
+            <div data-bind="click: $parent.selectMarkerHandler" class="demo-card-wide mdl-card mdl-shadow--2dp mdl-js-button mdl-js-ripple-effect">
               <div class="mdl-card__title">
                 <h2 data-bind="text: title" class="title mdl-card__title-text"></h2>
               </div>
@@ -58,10 +57,12 @@
       </nav>
     </div>
     <main class="mdl-layout__content">
-      <div id="neighborhood-map">
-      </div>
-      <button data-bind="click: showAllMarkers" title="Show all markers in map." class="show-makers-button mdl-button mdl-js-button mdl-button--fab mdl-js-ripple-effect mdl-button--colored">
+      <div id="neighborhood-map"></div>
+      <button data-bind="click: showAllMarkersHandler" title="Show all markers in map." class="show-makers-button mdl-button mdl-js-button mdl-button--fab mdl-js-ripple-effect mdl-button--colored">
         <i class="material-icons">location_on</i>
+      </button>
+      <button data-bind="click: toggleDrawingHandler" title="Draw a polygon for area search." class="draw-polygon-button mdl-button mdl-js-button mdl-button--fab mdl-js-ripple-effect mdl-button--colored">
+        <i class="material-icons">mode_edit</i>
       </button>
     </main>
   </div>
