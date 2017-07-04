@@ -57,8 +57,9 @@ This command basically will run ```gulp build``` first and then run server based
 1. **Google Map Javascript API**: [https://developers.google.com/maps/documentation/javascript/](https://developers.google.com/maps/documentation/javascript/), this project use Google Map API to display POI (restaurant) around user searched location.
 2. **Google Map Javascript - Geocoder**: In order to get accurate enough Latitude and Longitude to get street view, we try to use the Geocoder to convert Restaurant's address to Latitude and Longitude.
 3. **Google Map Javascript - Drawing Manager**: This website allow user to draw an polygon on the map to filter the restaurants. 
-4. **Foursquare API**: [https://developer.foursquare.com/](https://developer.foursquare.com/). This project, all POI (restaurant) around the user searched location is queried from Foursquare api. The name of restaurant, address, categories and rating will be dispalied in InforWindow when user click one of the location's marker.
-5. **Material Design Lite**: [https://getmdl.io/index.html](https://getmdl.io/index.html). To make a beautiful and responsive UI, I also include Material Design Lite package to build up the GUI of website.
+4. **KnockoutJS**: [knockoutjs](http://knockoutjs.com/index.html). This project is using KnockoutJS's MVVM pattern to display data from backend. 
+5. **Foursquare API**: [https://developer.foursquare.com/](https://developer.foursquare.com/). This project, all POI (restaurant) around the user searched location is queried from Foursquare api. The name of restaurant, address, categories and rating will be dispalied in InforWindow when user click one of the location's marker.
+6. **Material Design Lite**: [https://getmdl.io/index.html](https://getmdl.io/index.html). To make a beautiful and responsive UI, I also include Material Design Lite package to build up the GUI of website.
 
 ## Project structure
 ```
