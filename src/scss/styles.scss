@@ -29,6 +29,16 @@ body {
   height: $pano-size;
 }
 
+#map-container{
+  text-align: center;
+  @media screen and (min-width: 1025px) {
+    margin-left: $drawer-width !important;
+  };
+  p {
+    font-size: 20px;
+  }
+}
+
 .map_drawer {
   max-width: $drawer-width;
   width: $drawer-width;

@@ -47,7 +47,17 @@
 
    self.map = googleMap;
    self.markerList = ko.observableArray();
+   self.filteredMarkerList = ko.observableArray();
    self.selectedMarker = ko.observable();
+
+   var _updateFilterMarkerList = function() {
+     self.filteredMarkerList.removeAll();
+     self.markerList().forEach(function (marker) {
+       if(marker.getVisible()){
+          self.filteredMarkerList.push(marker);
+       }
+     });
+   };
 
    /**
     * When user selected the address from input field, the address will be saved in 
@@ -102,6 +112,8 @@
        if (fourSquareData.meta.code === 200) {
          self.markerList.removeAll();
          _generateMakers(fourSquareData, streetViewInfowindow);
+
+         _updateFilterMarkerList();
        } else {
          _handleErrors("No Venue found.");
        }
@@ -115,11 +127,10 @@
     * Also display the inforwidnow.
     */
    self.selectMarkerHandler = function(marker) {
-     _hideAllMarkers();
      self.selectedMarker(marker);
-     marker.setMap(map);
      _toggleBounce(marker);
      _populateInfoWindow(marker, streetViewInfowindow);
+     map.panTo(marker.position);
    };
 
    /**
@@ -167,12 +178,12 @@
      return location;
    }
 
-  /**
-   * This function will disable all markers from the map.
-   */
+   /**
+    * This function will disable all markers from the map.
+    */
    function _hideAllMarkers() {
      self.markerList().forEach(function(marker) {
-       marker.setMap(null);
+       marker.setVisible(false);
      });
    }
 
@@ -211,6 +222,7 @@
          categories: item.venue.categories[0].name,
          rating: item.venue.rating
        });
+       marker.setMap(map);
        self.markerList.push(marker);
        // Create an onclick event to open the large infowindow at each marker.
        marker.addListener('click', function() {
@@ -250,9 +262,14 @@
          '<div class="map-inforwindow infor-text-rating">' +
          '<div class="label">Rating:</div><div>' + marker.rating + '</div></div>' +
          '<div class="infor-text-address">' +
-         '<div class="label">Address"</div>' +
-         '<div><div>' + marker.address[0] + '</div><div>' + marker.address[1] + '</div><div>' + marker.address[2] + '</div></div></div>' +
-         '<div class="infor-text-categories">' +
+         '<div class="label">Address"</div><div>';
+
+         if(marker.address){
+            marker.address.forEach(function(addr){
+               content+='<div>' + addr + '</div>';
+            });
+         }
+         content += '</div></div><div class="infor-text-categories">' +
          '<div class="label">Categories:</div>' +
          '<div>' + marker.categories + '</div></div></div>';
 
@@ -302,12 +319,13 @@
      var bounds = new google.maps.LatLngBounds();
      // Extend the boundaries of the map for each marker and display the marker
      self.markerList().forEach(function(marker) {
-       marker.setMap(self.map);
+       marker.setVisible(true);
        bounds.extend(marker.position);
      });
      //  self.map.fitBounds(bounds);
      self.map.setCenter(bounds.getCenter());
      self.selectedMarker(null);
+     _updateFilterMarkerList();
    };
    /***************************************************************** */
 
@@ -355,11 +373,12 @@
    function searchWithinPolygon() {
      self.markerList().forEach(function(marker) {
        if (google.maps.geometry.poly.containsLocation(marker.position, polygon)) {
-         marker.setMap(map);
+         marker.setVisible(true);
        } else {
-         marker.setMap(null);
+         marker.setVisible(false);
        }
      });
+     _updateFilterMarkerList();
    }
 
    /**************************************************************************/
@@ -377,4 +396,8 @@
      zoom: 13
    });
    ko.applyBindings(new ViewModel(map)); // This makes Knockout get to work
+ }
+
+ function errorHandler(){
+   document.getElementById('map-container').innerHTML = "<div><p>Unable to reach Google Map</p><p>Please contact with WebSite Admin.</p></div>";
  }

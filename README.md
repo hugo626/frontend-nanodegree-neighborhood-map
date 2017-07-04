@@ -10,6 +10,49 @@ More detialed project specification can be fund from [Project Specification](htt
 ## Check Result
 This project is host by Github page, you can visit it from [HERE](https://hugo626.github.io/frontend-nanodegree-neighborhood-map/dist/).
 
+Or you can run build and serve localy. 
+
+## Build
+### Build Environment
+In order to build and serve the website locally you should:
+1. Install [node.js](https://nodejs.org/en/download/) first on your machine. 
+2. Install [Gulp](http://gulpjs.com/), 
+   ```
+   npm install gulp-cli -g
+   ``` 
+3. Go to the root folder of this project ```**/frontend-nanodegree-neighborhood-map/``` then run 
+   ```
+   npm install
+   ```
+If no error appears, then you are good to move to next step.
+### Build Site 
+To build this site, please run below command under the root folder of this project. 
+```
+  gulp
+```
+This command will remove contents in ```dist/``` folder, then minify css,js,html files and copied into ```dist/``` folder.
+
+Below list of all defined ```gulp``` command:
+```
+gulp
+   1. jshint                jshint task to check the js file
+   2. copy-html             copy, minified and compressed html to dist/
+   3. copy-js               copy, minified and compressed javascript to dist/js
+   4. process-sass          complie scss file into css and put it to src/css, then compressed and minified css file to dist/css folder.
+   5. clean                 remove the content of dist/ folder
+   6. serve                 run server based on dist/ folder
+```  
+## Run on Local Machine
+if you successfuly install and run through the build section, you should be ready for run the website on you machine. Since Gulp will run the local server on PORT 3000, so be sure the port is avaiable for use, or you can change the port number in [gulpfile.js](gulpfile.js).
+
+To run server on you machine, please run below command under the root folder of this project.
+```
+gulp serve
+```
+
+This command basically will run ```gulp build``` first and then run server based on ```dist/``` folder. When ```gulp serve``` is ready, it should open the default browser in your machine to visit
+```localhost:3000```. It is not opened automatically, please visit it by self.
+
 ## API and Thired Party Packages
 1. **Google Map Javascript API**: [https://developers.google.com/maps/documentation/javascript/](https://developers.google.com/maps/documentation/javascript/), this project use Google Map API to display POI (restaurant) around user searched location.
 2. **Google Map Javascript - Geocoder**: In order to get accurate enough Latitude and Longitude to get street view, we try to use the Geocoder to convert Restaurant's address to Latitude and Longitude.
