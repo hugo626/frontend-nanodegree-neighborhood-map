@@ -29,7 +29,7 @@ body {
   height: $pano-size;
 }
 
-#map-container{
+#map-container {
   text-align: center;
   @media screen and (min-width: 1025px) {
     margin-left: $drawer-width !important;
@@ -45,29 +45,27 @@ body {
   transform: translateX(-$drawer-width);
 }
 
-.show-makers-button{
+.draw-polygon-button {
   bottom: 20px;
   right: 70px;
   position: fixed;
 }
 
-.draw-polygon-button{
-  bottom: 20px;
-  right: 140px;
-  position: fixed;
-}
-
-.nav-title{
+.nav-title {
   font-weight: 800;
 }
-.title,.label{
+
+.title,
+.label {
   font-weight: 600;
 }
 
-.address-label-text,.map-inforwindow{
+.address-label-text,
+.map-inforwindow {
   display: flex;
+  text-align: left;
 }
 
-.infor-text-rating{
+.infor-text-rating {
   flex-flow: row wrap;
 }

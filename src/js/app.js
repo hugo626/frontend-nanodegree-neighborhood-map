@@ -52,9 +52,9 @@
 
    var _updateFilterMarkerList = function() {
      self.filteredMarkerList.removeAll();
-     self.markerList().forEach(function (marker) {
-       if(marker.getVisible()){
-          self.filteredMarkerList.push(marker);
+     self.markerList().forEach(function(marker) {
+       if (marker.getVisible()) {
+         self.filteredMarkerList.push(marker);
        }
      });
    };
@@ -66,10 +66,19 @@
     */
    autocompleteAddress.addListener('place_changed', function() {
      var place = autocompleteAddress.getPlace();
-     searchedCenter({
-       lat: place.geometry.location.lat(),
-       lng: place.geometry.location.lng()
-     });
+     if (place.geometry && place.geometry.location) {
+       searchedCenter({
+         lat: place.geometry.location.lat(),
+         lng: place.geometry.location.lng()
+       });
+     } else {
+       var newSearchCenter = _findAccurateLatLngByAddress(place.name);
+       if (newSearchCenter) {
+         searchedCenter(newSearchCenter);
+       }else{
+         _handleErrors("Unable to find the location you searched.\r\nPlease try use completed and formatted address.");
+       }
+     }
    });
 
    /**
@@ -112,7 +121,6 @@
        if (fourSquareData.meta.code === 200) {
          self.markerList.removeAll();
          _generateMakers(fourSquareData, streetViewInfowindow);
-
          _updateFilterMarkerList();
        } else {
          _handleErrors("No Venue found.");
@@ -161,13 +169,10 @@
     * @param {any} venueLocation the location which contains the address of the restaurant.
     * @returns any object which contains lat and lng of the given address.
     */
-   function _findAccurateLatLngByAddress(venueLocation) {
-     var location = {
-       lat: venueLocation.lat,
-       lng: venueLocation.lng
-     };
+   function _findAccurateLatLngByAddress(address) {
+     var location = null;
      geocoder.geocode({
-       'address': venueLocation.formattedAddress.join(' ')
+       'address': address
      }, function(results, status) {
        if (status === google.maps.GeocoderStatus.OK) {
          location = results[0].geometry.location;
@@ -177,6 +182,7 @@
      });
      return location;
    }
+
 
    /**
     * This function will disable all markers from the map.
@@ -210,8 +216,10 @@
     */
    function _generateMakers(fourSquareData, infowindow) {
      fourSquareData.response.groups[0].items.forEach(function(item, index) {
-       var location = _findAccurateLatLngByAddress(item.venue.location);
-
+       var location = {
+         lat: item.venue.location.lat,
+         lng: item.venue.location.lng
+       };
        var marker = new google.maps.Marker({
          position: location,
          title: item.venue.name,
@@ -260,18 +268,20 @@
          '<div class= "infor-text">' +
          '<div class="infor-text-title title">' + marker.title + '</div>' +
          '<div class="map-inforwindow infor-text-rating">' +
-         '<div class="label">Rating:</div><div>' + marker.rating + '</div></div>' +
+         '<div class="label">Rating:</div>' + '<div>' + marker.rating ? marker.rating : 'Rating is not specified.' + '</div></div>' +
          '<div class="infor-text-address">' +
          '<div class="label">Address"</div><div>';
 
-         if(marker.address){
-            marker.address.forEach(function(addr){
-               content+='<div>' + addr + '</div>';
-            });
-         }
-         content += '</div></div><div class="infor-text-categories">' +
+       if (marker.address) {
+         marker.address.forEach(function(addr) {
+           content += '<div>' + addr + '</div>';
+         });
+       } else {
+         content += '<div> Address is not specified.</div>';
+       }
+       content += '</div></div><div class="infor-text-categories">' +
          '<div class="label">Categories:</div>' +
-         '<div>' + marker.categories + '</div></div></div>';
+         '<div>' + marker.categories ? marker.categories : 'Categories is not specified.' + '</div></div></div>';
 
        if (status === google.maps.StreetViewStatus.OK) {
          var nearStreetViewLocation = data.location.latLng;
@@ -313,7 +323,8 @@
    }
 
    /**
-    * This function will be used to 
+    * This function will be used to show all markers on the map, when 
+    * Drawer is toggole off.
     */
    self.showAllMarkersHandler = function() {
      var bounds = new google.maps.LatLngBounds();
@@ -362,6 +373,7 @@
        if (polygon !== null) {
          polygon.setMap(null);
        }
+       self.showAllMarkersHandler();
      } else {
        drawingManager.setMap(map);
      }
@@ -398,6 +410,6 @@
    ko.applyBindings(new ViewModel(map)); // This makes Knockout get to work
  }
 
- function errorHandler(){
+ function errorHandler() {
    document.getElementById('map-container').innerHTML = "<div><p>Unable to reach Google Map</p><p>Please contact with WebSite Admin.</p></div>";
  }
